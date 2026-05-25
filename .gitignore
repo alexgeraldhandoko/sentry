@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+backend/.venv/
+
+# Environment variables
+frontend/.env
+frontend/.env*.local
+backend/.env
+
+# Cached output files
+frontend/.next/
+frontend/out/
+__pycache__/
+backend/**/*.pyc
+
+# Local VSCode settings
+.vscode/
+
+# Local machine settings
+.DS_Store
