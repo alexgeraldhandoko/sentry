@@ -18,3 +18,9 @@ backend/**/*.pyc
 
 # Local machine settings
 .DS_Store
+
+# Data files
+ml/data/
+
+# Checkpoint training model
+ml/models/checkpoint.pth
