@@ -11,10 +11,16 @@ backend/.env
 frontend/.next/
 frontend/out/
 __pycache__/
-backend/**/*.pyc
+*.pyc
 
 # Local VSCode settings
 .vscode/
 
 # Local machine settings
 .DS_Store
+
+# Data files
+ml/data/
+
+# Checkpoint training model
+ml/models/checkpoint.pth
