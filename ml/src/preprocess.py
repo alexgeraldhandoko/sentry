@@ -1,5 +1,15 @@
 from pathlib import Path
+
 import pandas as pd
+
+import torch
+
+import joblib
+
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler, PolynomialFeatures
 
 # ----------------------------------------------
 # Declare constants
@@ -63,4 +73,99 @@ def main():
     print("Label counts: ")
     print(y.value_counts())
 
-main()
+    # Split the dataset
+    X_temp, X_test, y_temp, y_test = train_test_split(
+        X,
+        y,
+        test_size=0.15,
+        random_state=DATA_SPLIT_SEED,
+        stratify=y
+    )
+    X_train, X_val, y_train, y_val = train_test_split(
+        X_temp,
+        y_temp,
+        test_size=(0.15/0.85),
+        random_state=DATA_SPLIT_SEED,
+        stratify=y_temp
+    )
+
+    # Define the preprocessing steps
+    preprocessor = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="median")),
+            ("raw_scaler", StandardScaler()),
+            ("poly", PolynomialFeatures(
+                degree=POLYNOMIAL_TRANSFORMATION_DEGREE,
+                include_bias=False
+            )),
+            ("transformed_scaler", StandardScaler())
+        ]
+    )
+
+    # Preprocess the X datasets and turn them into NumPy arrays
+    X_train_processed = preprocessor.fit_transform(X_train)
+    X_val_processed = preprocessor.transform(X_val)
+    X_test_processed = preprocessor.transform(X_test)
+
+    # Turn the X datasets from NumPy arrays to PyTorch tensors
+    X_train_tensor = torch.tensor(X_train_processed, dtype=torch.float32)
+    X_val_tensor = torch.tensor(X_val_processed, dtype=torch.float32)
+    X_test_tensor = torch.tensor(X_test_processed, dtype=torch.float32)
+
+    # Turn the y datasets from pandas df to NumPy arrays to PyTorch tensors
+    y_train_tensor = torch.tensor(y_train.to_numpy(), dtype=torch.float32).view(-1, 1)
+    y_val_tensor = torch.tensor(y_val.to_numpy(), dtype=torch.float32).view(-1, 1)
+    y_test_tensor = torch.tensor(y_test.to_numpy(), dtype=torch.float32).view(-1, 1)
+
+    # Print the tensor shapes for sanity check
+    print("Tensor shapes:")
+    print("--------------------------------------------")
+    print(f"X_train: {X_train_tensor.shape}")
+    print(f"y_train: {y_train_tensor.shape}")
+    print(f"X_val: {X_val_tensor.shape}")
+    print(f"y_val: {y_val_tensor.shape}")
+    print(f"X_test: {X_test_tensor.shape}")
+    print(f"y_test: {y_test_tensor.shape}")
+
+    # Store the tensors into their corresponding files
+    torch.save(
+        {
+            "X_train": X_train_tensor,
+            "y_train": y_train_tensor
+        },
+        processed_dir / "train.pt"
+    )
+    torch.save(
+        {
+            "X_val": X_val_tensor,
+            "y_val": y_val_tensor
+        },
+        processed_dir / "val.pt"
+    )
+    torch.save(
+        {
+            "X_test": X_test_tensor,
+            "y_test": y_test_tensor
+        },
+        processed_dir / "test.pt"
+    )
+
+    # Save the preprocessor
+    joblib.dump(
+        {
+            "preprocessor": preprocessor,
+            "raw_feature_names": feature_names,
+            "target_col": TARGET_COL,
+            "dropped_cols": cols_to_drop,
+            "polynomial_degree": POLYNOMIAL_TRANSFORMATION_DEGREE,
+            "input_dim_after_processing": X_train_tensor.shape[1]
+        },
+        processed_dir / "preprocessor.joblib"
+    )
+
+    # Print status message
+    print("Preprocessing complete")
+    print(f"Saved processed files to: {processed_dir}")
+
+if __name__ == "__main__":
+    main()
