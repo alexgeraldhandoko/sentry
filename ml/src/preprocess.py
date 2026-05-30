@@ -28,22 +28,21 @@ DROP_COLS = [
     "ERC20 most sent token type",
     "ERC20_most_rec_token_type"
 ]
+# Declare the paths
+ML_DIR = Path(__file__).resolve().parents[2]
+RAW_PATH = ML_DIR / "data" / "raw" / "data.csv"
+PROCESSED_DIR = ML_DIR / "data" / "processed"
 
 # ----------------------------------------------
 # Main processing function
 # ----------------------------------------------
 def main():
 
-    # Declare the paths
-    ml_dir = Path(__file__).resolve().parents[1]
-    raw_path = ml_dir / "data" / "raw" / "data.csv"
-    processed_dir = ml_dir / "data" / "processed"
-
     # Create the processed folder
-    processed_dir.mkdir(parents=True, exist_ok=True)
+    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 
     # Read the csv
-    df = pd.read_csv(raw_path)
+    df = pd.read_csv(RAW_PATH)
 
     # Clean the df column names from leading and trailing spaces
     df.columns = df.columns.str.strip()
@@ -133,21 +132,21 @@ def main():
             "X_train": X_train_tensor,
             "y_train": y_train_tensor
         },
-        processed_dir / "train.pt"
+        PROCESSED_DIR / "train.pt"
     )
     torch.save(
         {
             "X_val": X_val_tensor,
             "y_val": y_val_tensor
         },
-        processed_dir / "val.pt"
+        PROCESSED_DIR / "val.pt"
     )
     torch.save(
         {
             "X_test": X_test_tensor,
             "y_test": y_test_tensor
         },
-        processed_dir / "test.pt"
+        PROCESSED_DIR / "test.pt"
     )
 
     # Save the preprocessor
@@ -160,12 +159,12 @@ def main():
             "polynomial_degree": POLYNOMIAL_TRANSFORMATION_DEGREE,
             "input_dim_after_processing": X_train_tensor.shape[1]
         },
-        processed_dir / "preprocessor.joblib"
+        PROCESSED_DIR / "preprocessor.joblib"
     )
 
     # Print status message
     print("Preprocessing complete")
-    print(f"Saved processed files to: {processed_dir}")
+    print(f"Saved processed files to: {PROCESSED_DIR}")
 
 if __name__ == "__main__":
     main()
