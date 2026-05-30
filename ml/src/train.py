@@ -74,7 +74,13 @@ def train():
     # Loss function and optimiser to remember gradient history
     # regardless of epochs
     # -------------------------------------------------------------------
-    loss_fn = nn.BCEWithLogitsLoss()
+    # Calculate the positive class weight
+    num_of_fraud = (y_train == 1).sum()
+    num_of_non_fraud = (y_train == 0).sum()
+    pos_weight = num_of_non_fraud / num_of_fraud
+    pos_weight = pos_weight.reshape(1).to(device)
+
+    loss_fn = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
     optimizer = Adam(model.parameters(), lr=0.001)
 
     # -------------------------------------------------------------------
@@ -101,7 +107,7 @@ def train():
         # -------------------------------------------------------------------
         # Validate the model
         # -------------------------------------------------------------------
-        val_loss, val_accuracy = validate(model)
+        val_loss, val_accuracy = validate(model, loss_fn)
         print(f"Validation loss: {val_loss}")
         print(f"Validation accuracy: {val_accuracy}")
 
@@ -139,7 +145,7 @@ def train():
 
     # Print the best model test performance
     model.load_state_dict(torch.load(BEST_MODEL_PATH)["model_state"])
-    _, test_accuracy = test(model)
+    _, test_accuracy = test(model, loss_fn)
     print("Test performance:")
     print(f"Accuracy: {test_accuracy}")
 
@@ -204,7 +210,7 @@ def build_model():
 # Validate the model using validation dataset
 # Returns the loss and accuracy
 # -------------------------------------------------------------------
-def validate(model):
+def validate(model, loss_fn):
     # Load validation dataset
     dataset_dict = torch.load(PROCESSED_DIR / "val.pt")
     X_val = dataset_dict["X_val"].to(device)
@@ -223,7 +229,6 @@ def validate(model):
         logits = model(X_val)
 
         # Calculate loss
-        loss_fn = nn.BCEWithLogitsLoss()
         loss = loss_fn(logits, y_val)
 
         # Calculate accuracy
@@ -241,7 +246,7 @@ def validate(model):
 # -------------------------------------------------------------------
 # Test the model's performance on test data
 # -------------------------------------------------------------------
-def test(model):
+def test(model, loss_fn):
     # Load the test set
     dataset_dict = torch.load(PROCESSED_DIR / "test.pt")
     X_test = dataset_dict["X_test"].to(device)
@@ -257,7 +262,6 @@ def test(model):
         classifications = (probabilities >= 0.5).float()
         accuracy = (classifications == y_test).sum() / y_test.shape[0]
 
-        loss_fn = nn.BCEWithLogitsLoss()
         loss = loss_fn(logits, y_test)
 
     return loss.item(), accuracy.item()
