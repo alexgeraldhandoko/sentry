@@ -27,6 +27,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Train the model
 # -------------------------------------------------------------------
 def train():
+    print(f"Using {device} to train model")
     # -------------------------------------------------------------------
     # Load the arguments
     # -------------------------------------------------------------------
@@ -34,9 +35,13 @@ def train():
     checkpoint = args.checkpoint
     epochs = args.epochs
     batch_size = args.batch_size
+    threshold = args.threshold 
+    print("----------------------------------------")
     print(f"Use checkpoint: {checkpoint}")
     print(f"Epochs: {epochs}")
     print(f"Batch size: {batch_size}")
+    print(f"Threshold: {threshold}")
+    print("----------------------------------------")
 
     # -------------------------------------------------------------------
     # Load the saved training dataset
@@ -66,9 +71,9 @@ def train():
         start_epoch = checkpoint_data["epochs"]
 
     if BEST_MODEL_PATH.exists() and BEST_MODEL_PATH.stat().st_size > 0:
-        best_val_accuracy = torch.load(BEST_MODEL_PATH)["accuracy"]
+        best_val_f2 = torch.load(BEST_MODEL_PATH)["f2"]
     else:
-        best_val_accuracy = 0
+        best_val_f2 = 0
 
     # -------------------------------------------------------------------
     # Loss function and optimiser to remember gradient history
@@ -107,20 +112,28 @@ def train():
         # -------------------------------------------------------------------
         # Validate the model
         # -------------------------------------------------------------------
-        val_loss, val_accuracy = validate(model, loss_fn)
+        val_loss, val_accuracy, val_recall, val_precision, val_f2 = validate(model, loss_fn)
+        print("----------------------------------------")
         print(f"Validation loss: {val_loss}")
         print(f"Validation accuracy: {val_accuracy}")
+        print(f"Validation recall: {val_recall}")
+        print(f"Validation precision: {val_precision}")
+        print(f"Validation F2: {val_f2}")
+        print("----------------------------------------")
 
         # -------------------------------------------------------------------
         # Save best model
         # -------------------------------------------------------------------
-        if (val_accuracy > best_val_accuracy):
+        if (val_f2 > best_val_f2):
             # Save the model into models/best.pth
-            best_val_accuracy = val_accuracy
+            best_val_f2 = val_f2
             torch.save(
                 {
                     "model_state": model.state_dict(),
-                    "accuracy": best_val_accuracy,
+                    "accuracy": val_accuracy,
+                    "recall": val_recall,
+                    "precision": val_precision,
+                    "f2": best_val_f2,
                     "epochs": start_epoch + i + 1
                 },
                 BEST_MODEL_PATH
@@ -133,21 +146,34 @@ def train():
             {
                 "model_state": model.state_dict(),
                 "accuracy": val_accuracy,
+                "recall": val_recall,
+                "precision": val_precision,
+                "f2": val_f2,
                 "epochs": start_epoch + i + 1
             },
             CHECKPOINT_MODEL_PATH
         )
 
     # Print complete status as of the most recent epoch
+    print("----------------------------------------")
     print("Training complete")
     print(f"Epochs so far: {start_epoch + epochs}")
-    print(f"Last checkpoint accuracy: {torch.load(CHECKPOINT_MODEL_PATH)['accuracy']}")
+    print(f"Last checkpoint f2: {torch.load(CHECKPOINT_MODEL_PATH)['f2']}")
+    print("----------------------------------------")
 
-    # Print the best model test performance
-    model.load_state_dict(torch.load(BEST_MODEL_PATH)["model_state"])
-    _, test_accuracy = test(model, loss_fn)
-    print("Test performance:")
-    print(f"Accuracy: {test_accuracy}")
+    # Print the best model's validation performance
+    best_model_dict = torch.load(BEST_MODEL_PATH)
+    model.load_state_dict(best_model_dict["model_state"])
+    val_loss, val_accuracy, val_recall, val_precision, val_f2 = validate(model, loss_fn)
+    print("----------------------------------------")
+    print("The best validation performance: ")
+    print(f"Validation loss: {val_loss}")
+    print(f"Validation accuracy: {val_accuracy}")
+    print(f"Validation recall: {val_recall}")
+    print(f"Validation precision: {val_precision}")
+    print(f"Validation F2: {val_f2}")
+    print(f"Using {threshold} threshold")
+    print("----------------------------------------")
 
 # -------------------------------------------------------------------
 # Obtain the command line arguments that modify the programme execution 
@@ -174,6 +200,13 @@ def get_args():
         type=int,
         default=32,
         help="Number of training examples per training batch"
+    )
+
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=0.5,
+        help="Set confidence threshold for model binary classification"
     )
 
     return parser.parse_args()
@@ -211,6 +244,10 @@ def build_model():
 # Returns the loss and accuracy
 # -------------------------------------------------------------------
 def validate(model, loss_fn):
+    # Get threshold value from command line arguments
+    args = get_args()
+    threshold = args.threshold
+
     # Load validation dataset
     dataset_dict = torch.load(PROCESSED_DIR / "val.pt")
     X_val = dataset_dict["X_val"].to(device)
@@ -231,40 +268,27 @@ def validate(model, loss_fn):
         # Calculate loss
         loss = loss_fn(logits, y_val)
 
-        # Calculate accuracy
         probabilities = torch.sigmoid(logits)
-        classifications = (probabilities >= 0.5).float()
-        correct_predictions = (classifications == y_val).sum()
-        accuracy = correct_predictions / y_val.shape[0]
+        classifications = (probabilities >= threshold).float()
+
+        # Calculate metrics
+        tp = ((classifications == 1) & (y_val == 1)).sum()
+        tn = ((classifications == 0) & (y_val == 0)).sum()
+        fp = ((classifications == 1) & (y_val == 0)).sum()
+        fn = ((classifications == 0) & (y_val == 1)).sum()
+
+        # Calculate compound metrics
+        eps = 1e-8
+        accuracy = (tp + tn) / (tp + tn + fp + fn + eps)
+        recall = tp / (tp + fn + eps)
+        precision = tp / (tp + fp + eps)
+        f2 = 5 * ( (precision * recall) / ((4 * precision) + recall + eps) )
 
     # Put model back into training mode
     model.train()
 
-    # Return the loss and accuracy from the validation set
-    return loss.item(), accuracy.item()
-
-# -------------------------------------------------------------------
-# Test the model's performance on test data
-# -------------------------------------------------------------------
-def test(model, loss_fn):
-    # Load the test set
-    dataset_dict = torch.load(PROCESSED_DIR / "test.pt")
-    X_test = dataset_dict["X_test"].to(device)
-    y_test = dataset_dict["y_test"].to(device)
-
-    # Put the model into evaluation mode
-    model.eval()
-
-    # Turn off gradient calculation during testing
-    with torch.no_grad():
-        logits = model(X_test)
-        probabilities = torch.sigmoid(logits)
-        classifications = (probabilities >= 0.5).float()
-        accuracy = (classifications == y_test).sum() / y_test.shape[0]
-
-        loss = loss_fn(logits, y_test)
-
-    return loss.item(), accuracy.item()
+    # Return loss, accuracy, recall, precision, f2 from the validation set
+    return loss.item(), accuracy.item(), recall.item(), precision.item(), f2.item()
 
 if __name__ == "__main__":
     train()
