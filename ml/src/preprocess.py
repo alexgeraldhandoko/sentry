@@ -14,11 +14,11 @@ from sklearn.preprocessing import StandardScaler, PolynomialFeatures
 # ----------------------------------------------
 # Declare constants
 # ----------------------------------------------
-
 # The seed to split the dataset, so that the split is repeatable
 DATA_SPLIT_SEED = 42 
 POLYNOMIAL_TRANSFORMATION_DEGREE = 2
 TARGET_COL = "FLAG"
+
 # Columns that should be dropped because they do not contain transaction information
 # or is non-numeric
 DROP_COLS = [ 
@@ -28,8 +28,9 @@ DROP_COLS = [
     "ERC20 most sent token type",
     "ERC20_most_rec_token_type"
 ]
+
 # Declare the paths
-ML_DIR = Path(__file__).resolve().parents[2]
+ML_DIR = Path(__file__).resolve().parents[1]
 RAW_PATH = ML_DIR / "data" / "raw" / "data.csv"
 PROCESSED_DIR = ML_DIR / "data" / "processed"
 
@@ -72,7 +73,7 @@ def main():
     print("Label counts: ")
     print(y.value_counts())
 
-    # Split the dataset
+    # Split the dataset from dataframes into dataframes
     X_temp, X_test, y_temp, y_test = train_test_split(
         X,
         y,
