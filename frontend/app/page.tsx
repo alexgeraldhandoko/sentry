@@ -1,22 +1,22 @@
-"use client"
+"use client";
 
-import { Cormorant_Garamond } from "next/font/google"
-import { useState } from "react"
+import { Cormorant_Garamond } from "next/font/google";
+import { useState } from "react";
 
-const garamond = Cormorant_Garamond()
+const garamond = Cormorant_Garamond({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
 
 export default function Home() {
-  const [showFiles, setShowFiles] = useState(false)
-  const [selectedFileName, setSelectedFileName] = useState("")
-  const [file, setFile] = useState<File | null>(null)
-  const [classification, setClassification] = useState(null)
-  const [confidence, setConfidence] = useState(null)
-  const [trueLabel, setTrueLabel] = useState(null)
+  const [showFiles, setShowFiles] = useState(false);
+  const [selectedFileName, setSelectedFileName] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [classification, setClassification] = useState<string | null>(null);
+  const [confidence, setConfidence] = useState<number | string | null>(null);
+  const [trueLabel, setTrueLabel] = useState<string | number | null>(null);
 
-  const csvFiles = [
-    "fraudulent_test_1.csv",
-    "legitimate_test_1.csv"
-  ]
+  const csvFiles = ["fraudulent_test_1.csv", "legitimate_test_1.csv"];
 
   const chooseCsvFile = async (fileName: string) => {
     const response = await fetch(`/transactions/${fileName}`);
@@ -29,102 +29,247 @@ export default function Home() {
     const blob = await response.blob();
 
     const selectedFile = new File([blob], fileName, {
-      type: "text/csv"
+      type: "text/csv",
     });
 
     setFile(selectedFile);
     setSelectedFileName(fileName);
     setShowFiles(false);
-  }
+  };
 
   const display_files = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     setShowFiles(!showFiles);
-  }
-  
-  const predict = async (event: React.MouseEvent<HTMLButtonElement>) => {
-    // Prevents the form from being submitted and page reloading first
-    event.preventDefault()
+  };
 
-    // Make sure a file has been selected
+  const predict = async (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+
     if (!file) {
       console.error("File has not been selected.");
       return;
     }
 
-    // Append the file to formdata
     const formData = new FormData();
     formData.append("file", file);
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/predict",
-        {
-          method: "POST",
-          body: formData
-        }
-      );
+      const response = await fetch("http://127.0.0.1:8000/predict", {
+        method: "POST",
+        body: formData,
+      });
+
       if (!response.ok) {
         throw new Error("Failed to make prediction.");
       }
 
       const data = await response.json();
-      setClassification(data.classification)
-      setConfidence(data.confidence)
-      setTrueLabel(data.true_label)
+
+      setClassification(data.classification);
+      setConfidence(data.confidence);
+      setTrueLabel(data.true_label);
     } catch (error) {
       console.error("Failed to analyse the transaction: ", error);
     }
-  }
-  
+  };
+
   return (
-    <main className="min-h-screen bg-stone-100 px-6 py-4">
-      <h1 className={`${garamond.className} text-8xl font-bold text-stone-900`}>Sentry</h1>
-      <div className="mx-auto max-w-3xl rounded-2xl bg-white mt-8 px-4 py-4">
-        <h2 className={`${garamond.className} text-5xl font-semibold mt-2 bg-stone-100`}>
+  <main className="min-h-screen bg-[#f3eadc] px-10 py-6 text-[#211a16]">
+    <div className="mx-auto max-w-6xl">
+      {/* Navbar */}
+      <nav className="border-t-4 border-[#c8ad78] border-b border-[#c8b18a] py-3">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <span
+            className={`${garamond.className} text-xl font-semibold tracking-tight text-[#6b1f2a]`}
+          >
+            Sentry
+          </span>
+
+          <div className="flex flex-wrap gap-x-7 gap-y-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#6d5a43]">
+            <a href="" className="transition hover:text-[#6b1f2a]">
+              Detector
+            </a>
+
+            <a href="" className="transition hover:text-[#6b1f2a]">
+              Model Performance
+            </a>
+
+            <a href="" className="transition hover:text-[#6b1f2a]">
+              Dataset
+            </a>
+
+            <a href="" className="transition hover:text-[#6b1f2a]">
+              About Us
+            </a>
+          </div>
+        </div>
+      </nav>
+
+      {/* Header */}
+      <header className="border-b border-[#c8b18a] py-8">
+        <h1
+          className={`${garamond.className} text-6xl font-semibold tracking-tight text-[#6b1f2a] md:text-7xl`}
+        >
+          Detector
+        </h1>
+
+        <p
+          className={`${garamond.className} mt-2 text-xl text-[#6d5a43] md:text-2xl`}
+        >
           Fraudulent Ethereum Transaction Detector
-        </h2>
-        <br></br>
+        </p>
+      </header>
 
-        <form className="space-y-4">
-          <button onClick={display_files} className="border border-stone-300 px-4 py-1 
-          mr-4 font-medium transition hover:bg-stone-100">
-            Choose transaction to make
-          </button>
-          <br></br>
-          {
-            showFiles && (
-              csvFiles.map((filename) => (
-                <button
-                  key={filename}
-                  type="button"
-                  onClick={() => chooseCsvFile(filename)}
-                  className="bg-stone-500 rounded-lg text-white font-medium transition
-                  hover:bg-stone-700 px-4 ml-2 mr-2">
-                  {filename}
-                </button>
-              ))
-            )
-          }
-          <br></br>
-          <button onClick={predict} className="border border-stone-300 px-4 py-1 mr-4 
-          font-medium transition hover:bg-stone-100">
-            Analyse transaction
-          </button>
-          <h3 className="mt-2 text-sm text-stone-600">
-            The model will output its decision regarding the transaction.
-          </h3>
-          {classification && 
-          <div className="mt-8 border-stone-200 bg-stone-50 font-bold">
-            {`Transaction is: ${classification}`}
-          </div>}
-          {confidence && <h3>{`Analysed with confidence: ${confidence}%`}</h3>}
-          {trueLabel && <h3>{`The transaction is actually: ${trueLabel}`}</h3>}
-        </form>
+      {/* Main detector section */}
+      <section className="mt-8 grid border border-[#c8b18a] bg-[#fffaf2] lg:grid-cols-[1.15fr_0.85fr]">
+        <section className="border-b border-[#c8b18a] p-6 lg:border-b-0 lg:border-r">
+          <div className="border-b border-[#d8c6aa] pb-5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#8a6b3d]">
+              Secure ML Review
+            </p>
 
-        <h3 className="mt-8 text-sm text-stone-600">
-          The model has not seen these transactions previously, nor will it memorise these transactions.
-        </h3>
-      </div>
-    </main>
-  )
+            <h2
+              className={`${garamond.className} mt-3 text-3xl font-semibold text-[#2b211b] md:text-4xl`}
+            >
+              Review a Transaction
+            </h2>
+
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-[#67594d]">
+              Select a prepared CSV transaction file and submit it for model
+              analysis. Sentry will return its classification, confidence level,
+              and the known label for comparison.
+            </p>
+
+            <p className="pt-4 text-sm leading-6 text-[#67594d]">
+              The model has not seen these transactions previously, nor will it
+              memorise these transactions.
+            </p>
+          </div>
+
+          <form className="mt-6 space-y-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <button
+                type="button"
+                onClick={display_files}
+                className="border border-[#b89d70] bg-[#fffaf2] px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-[#3a2d24] transition hover:bg-[#efe2cf]"
+              >
+                {selectedFileName ? "Change Transaction File" : "Select a File"}
+              </button>
+
+              <button
+                type="button"
+                onClick={predict}
+                className="border border-[#6b1f2a] bg-[#6b1f2a] px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-[#4f1720]"
+              >
+                Analyse Transaction
+              </button>
+            </div>
+
+            {showFiles && (
+              <div className="border border-[#c8b18a] bg-[#f8f0e4] p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#8a6b3d]">
+                  Available Files
+                </p>
+
+                <div className="mt-3 grid gap-2">
+                  {csvFiles.map((filename) => (
+                    <button
+                      key={filename}
+                      type="button"
+                      onClick={() => chooseCsvFile(filename)}
+                      className="border border-[#c8b18a] bg-[#fffaf2] px-3 py-2.5 text-left text-xs font-medium text-[#3a2d24] transition hover:bg-[#efe2cf]"
+                    >
+                      {filename}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="border border-[#d8c6aa] bg-[#fffdf8] p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#8a6b3d]">
+                Current Selection
+              </p>
+
+              <p className="mt-2 text-sm text-[#3a2d24]">
+                {selectedFileName || "No CSV file selected yet."}
+              </p>
+            </div>
+          </form>
+        </section>
+
+        {/* Prediction output */}
+        <aside className="bg-[#fbf4e9] p-6">
+          <div className="border-b border-[#c8b18a] pb-5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#8a6b3d]">
+              Prediction Output
+            </p>
+
+            <h3
+              className={`${garamond.className} mt-3 text-3xl font-semibold text-[#2b211b] md:text-4xl`}
+            >
+              Model Decision
+            </h3>
+
+            <p className="mt-4 text-sm leading-6 text-[#67594d]">
+              The model will output its decision regarding the selected
+              transaction.
+            </p>
+          </div>
+
+          {classification !== null ? (
+            <div className="mt-6 divide-y divide-[#d8c6aa] border border-[#c8b18a] bg-[#fffaf2]">
+              <div className="p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8a6b3d]">
+                  Classification
+                </p>
+
+                <p
+                  className={`${garamond.className} mt-2 text-3xl font-semibold text-[#6b1f2a]`}
+                >
+                  {classification}
+                </p>
+              </div>
+
+              <div className="p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8a6b3d]">
+                  Confidence
+                </p>
+
+                <p
+                  className={`${garamond.className} mt-2 text-3xl font-semibold text-[#2b211b]`}
+                >
+                  {confidence}%
+                </p>
+              </div>
+
+              <div className="p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8a6b3d]">
+                  True Label
+                </p>
+
+                <p
+                  className={`${garamond.className} mt-2 text-3xl font-semibold text-[#2b211b]`}
+                >
+                  {trueLabel}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-6 border border-dashed border-[#b89d70] bg-[#fffaf2] p-5">
+              <p className="text-sm leading-6 text-[#67594d]">
+                No analysis has been run yet. Select a transaction file, then
+                click{" "}
+                <span className="font-semibold text-[#6b1f2a]">
+                  Analyse Transaction
+                </span>
+                .
+              </p>
+            </div>
+          )}
+        </aside>
+      </section>
+    </div>
+  </main>
+  );
 }
