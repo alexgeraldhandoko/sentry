@@ -65,6 +65,8 @@ export default function Home() {
 
       const data = await response.json();
 
+      await recordTransaction(data);
+
       setClassification(data.classification);
       setConfidence(data.confidence);
       setTrueLabel(data.true_label);
@@ -72,6 +74,23 @@ export default function Home() {
       console.error("Failed to analyse the transaction: ", error);
     }
   };
+
+  const recordTransaction = async (data : JSON) => {
+    const response = await fetch("http://127.0.0.1:8000/record-transaction", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify(data)
+    })
+
+    if (!response.ok) {
+      console.error("Failed to record transaction.");
+      return;
+    }
+
+    console.log("Successfully recorded transaction.")
+  }
 
   return (
   <main className="min-h-screen bg-[#f3eadc] px-10 py-6 text-[#211a16]">
