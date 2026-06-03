@@ -25,11 +25,16 @@ THRESHOLD = 0.5
 MAX_CSV_FILE_SIZE = 5 * 1024 * 1024
 
 # ---------------------------------
-# Declare blockchain constants
+# Declare app
+# ---------------------------------
+app = FastAPI()
+
+# ---------------------------------
+# Declare the blockchain constants
 # ---------------------------------
 BLOCKCHAIN_URL = os.environ["BLOCKCHAIN_URL"]
-WALLET_PRIVATE_KEY = os.environ["WALLET_PRIVATE_KEY"]
 SMART_CONTRACT_ADDRESS = os.environ["SMART_CONTRACT_ADDRESS"]
+WALLET_PRIVATE_KEY = os.environ["WALLET_PRIVATE_KEY"]
 
 BLOCKCHAIN_ABI = [
     {
@@ -61,34 +66,29 @@ BLOCKCHAIN_ABI = [
             {"internalType": "string", "name": "classification", "type": "string"},
             {"internalType": "uint256", "name": "confidence", "type": "uint256"},
             {"internalType": "uint256", "name": "trueLabel", "type": "uint256"},
-            {"internalType": "uint256", "name": "timeStamp", "type": "uint256"}
+            {"internalType": "uint256", "name": "timestamp", "type": "uint256"}
         ],
         "stateMutability": "view",
         "type": "function"
-    }
+    } 
 ]
 
 # ---------------------------------
-# Make the blockchain connection
+# Set up web3 connection to the node
 # ---------------------------------
-# Connect to web 3
 web3 = Web3(Web3.HTTPProvider(BLOCKCHAIN_URL))
-if not web3.is_connected():
-    raise RuntimeError("FastAPI could not connect to the blockchain node.")
 
-# Make smart contract
+if not web3.is_connected():
+    raise RuntimeError(
+        "FastAPI could not connect to the blockchain node."
+    )
+
 smart_contract = web3.eth.contract(
     address=Web3.to_checksum_address(SMART_CONTRACT_ADDRESS),
     abi=BLOCKCHAIN_ABI
 )
 
-# Create wallet
 wallet = web3.eth.account.from_key(WALLET_PRIVATE_KEY)
-
-# ---------------------------------
-# Declare app
-# ---------------------------------
-app = FastAPI()
 
 # ---------------------------------
 # Set CORS allow list
@@ -153,44 +153,44 @@ def record_transaction(data: dict):
     # Extract the data fields
     classification = data["classification"]
     confidence = data["confidence"]
-    true_label = data["true_label"]
+    true_label = int(data["true_label"])
 
-    # Convert the confidence percentage to 4 digits
     confidence_integer = int(round(float(confidence) * 100))
 
     # Build the transaction
     transaction = smart_contract.functions.recordTransaction(
         classification,
         confidence_integer,
-        int(true_label)
+        true_label
     ).build_transaction({
         "from": wallet.address,
         "nonce": web3.eth.get_transaction_count(wallet.address),
+        "chainId": web3.eth.chain_id,
         "gas": 300000,
-        "gasPrice": web3.eth.gas_price,
-        "chainId": web3.eth.chain_id
+        "gasPrice": web3.eth.gas_price
     })
 
-    # Sign the transaction
-    signed_transaction = web3.eth.account.sign_transaction(transaction, 
-        private_key=WALLET_PRIVATE_KEY)
+    # Sign the transaction 
+    signed_transaction = web3.eth.account.sign_transaction(
+        transaction, private_key=WALLET_PRIVATE_KEY)
 
     # Send the transaction
-    transaction_hash = web3.eth.send_raw_transaction(signed_transaction.raw_transaction)
+    transaction_hash = web3.eth.send_raw_transaction(
+        signed_transaction.raw_transaction)
 
-    # Wait for transaction receipt
+    # Wait for the transaction to come back
     transaction_receipt = web3.eth.wait_for_transaction_receipt(
-        transaction_hash=transaction_hash)
-    if (transaction_receipt.status != 1):
+        transaction_hash=transaction_hash
+    )
+    if transaction_receipt.status != 1:
         raise HTTPException(
             status_code=500,
             detail="Internal server error. Blockchain transaction failed."
         )
 
-    # If transaction receipt successfully received, return
-    # success message, transaction hash, and block number
+    # Return success message, transaction hash, and block number
     return {
-        "message": "Blockchain transaction successful.",
+        "message": "Transaction successfully recorded.",
         "transaction_hash": transaction_hash.hex(),
-        "block_no": transaction_receipt.blockNumber
+        "block_number": transaction_receipt.blockNumber
     }
