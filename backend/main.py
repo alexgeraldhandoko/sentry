@@ -1,10 +1,13 @@
 import sys
+import os
 
 from fastapi import FastAPI, UploadFile, HTTPException
 
 from pathlib import Path
 
 from fastapi.middleware.cors import CORSMiddleware
+
+from web3 import Web3
 
 # ---------------------------------
 # Import predict function from predict
@@ -25,6 +28,67 @@ MAX_CSV_FILE_SIZE = 5 * 1024 * 1024
 # Declare app
 # ---------------------------------
 app = FastAPI()
+
+# ---------------------------------
+# Declare the blockchain constants
+# ---------------------------------
+BLOCKCHAIN_URL = os.environ["BLOCKCHAIN_URL"]
+SMART_CONTRACT_ADDRESS = os.environ["SMART_CONTRACT_ADDRESS"]
+WALLET_PRIVATE_KEY = os.environ["WALLET_PRIVATE_KEY"]
+
+BLOCKCHAIN_ABI = [
+    {
+        "inputs": [
+            {"internalType": "string", "name": "classification", "type": "string"},
+            {"internalType": "uint256", "name": "confidence", "type": "uint256"},
+            {"internalType": "uint256", "name": "trueLabel", "type": "uint256"}
+        ],
+        "name": "recordTransaction",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    }, 
+    {
+        "inputs": [],
+        "name": "getTransactionCount",
+        "outputs": [
+            {"internalType": "uint256", "name": "transactionCount", "type": "uint256"}
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    }, 
+    {
+        "inputs": [
+            {"internalType": "uint256", "name": "index", "type": "uint256"}
+        ],
+        "name": "getTransactionAtIndex",
+        "outputs": [
+            {"internalType": "string", "name": "classification", "type": "string"},
+            {"internalType": "uint256", "name": "confidence", "type": "uint256"},
+            {"internalType": "uint256", "name": "trueLabel", "type": "uint256"},
+            {"internalType": "uint256", "name": "timestamp", "type": "uint256"}
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    } 
+]
+
+# ---------------------------------
+# Set up web3 connection to the node
+# ---------------------------------
+web3 = Web3(Web3.HTTPProvider(BLOCKCHAIN_URL))
+
+if not web3.is_connected():
+    raise RuntimeError(
+        "FastAPI could not connect to the blockchain node."
+    )
+
+smart_contract = web3.eth.contract(
+    address=Web3.to_checksum_address(SMART_CONTRACT_ADDRESS),
+    abi=BLOCKCHAIN_ABI
+)
+
+wallet = web3.eth.account.from_key(WALLET_PRIVATE_KEY)
 
 # ---------------------------------
 # Set CORS allow list
@@ -82,4 +146,51 @@ async def predict(file: UploadFile):
         "classification": prediction_results["classification"],
         "confidence": prediction_results["confidence"],
         "true_label": prediction_results["true_label"]
+    }
+
+@app.post("/record-transaction")
+def record_transaction(data: dict):
+    # Extract the data fields
+    classification = data["classification"]
+    confidence = data["confidence"]
+    true_label = int(data["true_label"])
+
+    confidence_integer = int(round(float(confidence) * 100))
+
+    # Build the transaction
+    transaction = smart_contract.functions.recordTransaction(
+        classification,
+        confidence_integer,
+        true_label
+    ).build_transaction({
+        "from": wallet.address,
+        "nonce": web3.eth.get_transaction_count(wallet.address),
+        "chainId": web3.eth.chain_id,
+        "gas": 300000,
+        "gasPrice": web3.eth.gas_price
+    })
+
+    # Sign the transaction 
+    signed_transaction = web3.eth.account.sign_transaction(
+        transaction, private_key=WALLET_PRIVATE_KEY)
+
+    # Send the transaction
+    transaction_hash = web3.eth.send_raw_transaction(
+        signed_transaction.raw_transaction)
+
+    # Wait for the transaction to come back
+    transaction_receipt = web3.eth.wait_for_transaction_receipt(
+        transaction_hash=transaction_hash
+    )
+    if transaction_receipt.status != 1:
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error. Blockchain transaction failed."
+        )
+
+    # Return success message, transaction hash, and block number
+    return {
+        "message": "Transaction successfully recorded.",
+        "transaction_hash": transaction_hash.hex(),
+        "block_number": transaction_receipt.blockNumber
     }
