@@ -9,6 +9,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from web3 import Web3
 
+from dotenv import load_dotenv
+# ---------------------------------
+# Load backend/.venv into os.environ
+# ---------------------------------
+load_dotenv(Path(__file__).resolve().parents[0] / ".env")
+
 # ---------------------------------
 # Import predict function from predict
 # ---------------------------------
@@ -41,7 +47,7 @@ BLOCKCHAIN_ABI = [
         "inputs": [
             {"internalType": "string", "name": "classification", "type": "string"},
             {"internalType": "uint256", "name": "confidence", "type": "uint256"},
-            {"internalType": "uint256", "name": "trueLabel", "type": "uint256"}
+            {"internalType": "string", "name": "trueLabel", "type": "string"}
         ],
         "name": "recordTransaction",
         "outputs": [],
@@ -65,7 +71,7 @@ BLOCKCHAIN_ABI = [
         "outputs": [
             {"internalType": "string", "name": "classification", "type": "string"},
             {"internalType": "uint256", "name": "confidence", "type": "uint256"},
-            {"internalType": "uint256", "name": "trueLabel", "type": "uint256"},
+            {"internalType": "string", "name": "trueLabel", "type": "string"},
             {"internalType": "uint256", "name": "timestamp", "type": "uint256"}
         ],
         "stateMutability": "view",
@@ -153,7 +159,7 @@ def record_transaction(data: dict):
     # Extract the data fields
     classification = data["classification"]
     confidence = data["confidence"]
-    true_label = int(data["true_label"])
+    true_label = data["true_label"]
 
     confidence_integer = int(round(float(confidence) * 100))
 

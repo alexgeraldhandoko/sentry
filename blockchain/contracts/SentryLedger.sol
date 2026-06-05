@@ -6,7 +6,7 @@ contract SentryLedger {
     struct TransactionRecord {
         string classification;
         uint256 confidence;
-        uint256 trueLabel;
+        string trueLabel;
         uint256 timestamp;
     }
 
@@ -15,7 +15,7 @@ contract SentryLedger {
     function recordTransaction(
         string memory classification,
         uint256 confidence,
-        uint256 trueLabel
+        string memory trueLabel
     ) public {
         // Create new transaction record object
         TransactionRecord memory newTransaction = TransactionRecord(
