@@ -24,3 +24,8 @@ ml/data/
 
 # Checkpoint training model
 ml/models/checkpoint.pth
+
+# Hardhat files
+blockchain/artifacts/
+blockchain/cache/
+blockchain/ignition/deployments/
