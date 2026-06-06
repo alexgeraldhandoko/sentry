@@ -34,4 +34,8 @@ contract SentryLedger {
     ) public view returns (TransactionRecord memory) {
         return transactionHistory[index];
     }
+
+    function getTransactionHistory() public view returns (TransactionRecord[] memory) {
+        return transactionHistory;
+    }
 }

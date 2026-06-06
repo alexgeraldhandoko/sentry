@@ -76,7 +76,40 @@ BLOCKCHAIN_ABI = [
         ],
         "stateMutability": "view",
         "type": "function"
-    } 
+    }, 
+    {
+        "inputs": [],
+        "name": "getTransactionHistory",
+        "outputs": [
+            {"internalType": "struct SentryLedger.TransactionRecord[]", 
+             "name": "transactionHistory", 
+             "type": "tuple[]",
+             "components": [
+                 {
+                     "internalType": "string",
+                     "name": "classification",
+                     "type": "string"
+                 }, 
+                 {
+                     "internalType": "uint256",
+                     "name": "confidence",
+                     "type": "uint256"
+                 }, 
+                 {
+                     "internalType": "string",
+                     "name": "trueLabel",
+                     "type": "string"
+                 }, 
+                 {
+                     "internalType": "uint256",
+                     "name": "timestamp",
+                     "type": "uint256"
+                 }
+             ]}
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    }
 ]
 
 # ---------------------------------
@@ -200,3 +233,21 @@ def record_transaction(data: dict):
         "transaction_hash": transaction_hash.hex(),
         "block_number": transaction_receipt.blockNumber
     }
+
+@app.get("/get-transaction-history")
+def get_transaction_history():
+    # Call the view getTransactionHistory function
+    transaction_history = (smart_contract.functions
+        .getTransactionHistory().call())
+    
+    formatted_transaction_history = []
+
+    for transaction in transaction_history:
+        formatted_transaction_history.append({
+            "classification": transaction[0],
+            "confidence": transaction[1]/ 100,
+            "trueLabel": transaction[2],
+            "timestamp": transaction[3]
+        })
+
+    return formatted_transaction_history
