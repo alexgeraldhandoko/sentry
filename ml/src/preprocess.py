@@ -4,7 +4,6 @@ from dataclasses import dataclass
 
 import pandas as pd
 import numpy as np
-
 import torch
 
 import joblib
@@ -21,6 +20,7 @@ from sklearn.preprocessing import StandardScaler, PolynomialFeatures
 DATA_SPLIT_SEED = 42 
 POLYNOMIAL_TRANSFORMATION_DEGREE = 2
 TARGET_COL = "FLAG"
+NUM_OF_DEMO_FILES_PER_LABEL = 20
 
 # Columns that should be dropped because they do not contain transaction information
 # or is non-numeric
@@ -36,12 +36,15 @@ DROP_COLS = [
 ML_DIR = Path(__file__).resolve().parents[1]
 RAW_PATH = ML_DIR / "data" / "raw" / "data.csv"
 PROCESSED_DIR = ML_DIR / "data" / "processed"
+SAVE_TEST_FILES_PATH = Path(__file__).resolve().parents[2] / "frontend" / "public" / "transactions"
+SAVE_TEST_FILES_PATH.mkdir(parents=True, exist_ok=True)
 
 # ----------------------------------------------
 # Data containers
 # ----------------------------------------------
 @dataclass(frozen=True)
 class ExtractionResult:
+    original_df: pd.DataFrame
     X: pd.DataFrame
     y: pd.Series
     final_dropped_cols: list[str]
@@ -111,6 +114,7 @@ def extract_df_from_csv():
     print(y.value_counts())
 
     return ExtractionResult(
+        original_df=df,
         X=X, 
         y=y, 
         final_dropped_cols=cols_to_drop, 
@@ -216,6 +220,26 @@ def print_dataset_tensors(dataset_tensors: DatasetTensors):
     print(f"y_test: {dataset_tensors.y_test.shape}")
 
 # ----------------------------------------------
+# Generate demo transactions from the dataframe into 
+# csv files and save them into frontend folder
+# ----------------------------------------------
+def generate_demo_transactions(extraction_result: ExtractionResult,
+                               dataset_split: DatasetSplits):
+    # Extract the df rows that end up inside the test set
+    df = extraction_result.original_df.loc[dataset_split.X_test.index].copy()
+
+    # Extract the fraudulent and legitimate rows
+    fraudulent_df = df[df[TARGET_COL] == 1].head(NUM_OF_DEMO_FILES_PER_LABEL)
+    legitimate_df = df[df[TARGET_COL] == 0].head(NUM_OF_DEMO_FILES_PER_LABEL)
+
+    for i in range(NUM_OF_DEMO_FILES_PER_LABEL):
+        fraudulent_df.iloc[[i]].to_csv(
+            SAVE_TEST_FILES_PATH / f"fraudulent_test_{i + 1}.csv", index=False)
+        legitimate_df.iloc[[i]].to_csv(
+            SAVE_TEST_FILES_PATH / f"legitimate_test_{i + 1}.csv", index=False
+        )
+
+# ----------------------------------------------
 # Save processed tensors into file
 # ----------------------------------------------
 def save_dataset_tensors(dataset_tensors: DatasetTensors):
@@ -287,6 +311,10 @@ def main():
 
     # Print the tensor shapes for sanity check
     print_dataset_tensors(dataset_tensors)
+
+    # Generate and save the demo transactions from the test dataframe
+    generate_demo_transactions(dataset_split=dataset_split,
+        extraction_result=extraction_result)
 
     # Save results
     save_dataset_tensors(dataset_tensors=dataset_tensors)
