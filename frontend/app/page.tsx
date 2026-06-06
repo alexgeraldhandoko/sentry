@@ -142,6 +142,10 @@ export default function Home() {
                 Detector
               </a>
 
+              <a href="transaction-history" className="transition hover:text-[#6b1f2a]">
+                Transaction History
+              </a>
+
               <a href="" className="transition hover:text-[#6b1f2a]">
                 Model Performance
               </a>
