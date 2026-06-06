@@ -16,7 +16,11 @@ export default function Home() {
   const [confidence, setConfidence] = useState<number | string | null>(null);
   const [trueLabel, setTrueLabel] = useState<string | number | null>(null);
 
-  const csvFiles = ["fraudulent_test_1.csv", "legitimate_test_1.csv"];
+  let csvFiles = [];
+  for (let i = 0; i < 20; i++) {
+    csvFiles.push(`fraudulent_test_${i + 1}.csv`);
+    csvFiles.push(`legitimate_test_${i + 1}.csv`);
+  }
 
   const chooseCsvFile = async (fileName: string) => {
     const response = await fetch(`/transactions/${fileName}`);
